@@ -33,7 +33,7 @@ the tail call `buffer_read` I've been able to parse enough characters to solve t
 
 ## Day 1 Part 2
 
-There are two solutions here. Define `EXAMINE_CHAR` to either `examine_char2` or `eaxmine_char3`. 
+There are two solutions here. Define `EXAMINE_CHAR` to either `examine_char2` or `examine_char3`. 
 
 The version implemented in `examine_char3` uses an FSM to parse the digits. This uses less stack 
 space, so I can use a larger size for ADVENT_BUFFER_LEN (which would allow for parsing a bigger 
