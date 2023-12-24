@@ -39,3 +39,5 @@ The version implemented in `examine_char3` uses an FSM to parse the digits. This
 space, so I can use a larger size for ADVENT_BUFFER_LEN (which would allow for parsing a bigger 
 file if necessary).
 
+---
+If you want to learn more about eBPF, you might want to check out my repo and book [Learning eBPF](https://github.com/lizrice/learning-ebpf)
