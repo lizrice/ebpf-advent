@@ -419,34 +419,7 @@ static long examine_char2(u32 index, struct advent_state *astate) {
 	return 0;
 }
 
-// For Day 1 Part 2, using a state machine 
-//
-//          e  i  g  h  t  o  n  r  w  f  u  v  s  x
-// 0        1           7  5  22       12       17
-// 1 e         2
-// 2 ei           3
-// 3 eig             4
-// 4 eigh               *8  
-// 5 o                        6
-// 6 on     *1
-// 7 t               8               11
-// 8 th                          9
-// 9 thr    10
-//10 thre   *3
-//11 tw                    *2 
-//12 f         15          13
-//13 fo                                   14
-//14 fou                         *4
-//15 fi                                      15  
-//16 fiv    *5
-//17 s      19 18
-//18 si                                             *6
-//19 se                                      20
-//20 sev    21
-//21 seve                     *7
-//22 n         23          
-//23 ni                       24
-//24 nin    *9                 
+// For Day 1 Part 2, using a state machine (set up in day1.c)
 static long examine_char3(u32 index, struct advent_state *astate) {
 	struct state_input si;
 	struct state_output *so;
