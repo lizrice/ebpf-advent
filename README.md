@@ -4,8 +4,8 @@ My challenge to myself: implement the Advent of Code challenges entirely in
 eBPF. Having done these challenges before I know the input is essentially a
 file. I want to simply be able to `cat` the input file, and have eBPF tell me
 the answer. None of the problem-solving logic is to be in user space - all I'm
-allowing myself to do in user space is load the BPF programs and maps, and
-output the results. 
+allowing myself to do in user space is load the BPF programs, initialize and 
+load maps, and output the results. 
 
 I've used a kernel v6.5.0 as supplied in Ubuntu 23.10
 
