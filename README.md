@@ -9,9 +9,7 @@ load maps, and output the results.
 
 I've used a kernel v6.5.0 as supplied in Ubuntu 23.10
 
-
-Uploading Screen Recording 2023-12-24 at 16.53.53.mov…
-
+https://github.com/lizrice/ebpf-advent/assets/458616/d5c7d3ca-0510-485b-b5d5-7f40a531046e
 
 ## Day 1 Part 1
 
@@ -30,12 +28,14 @@ contents of the buffer is triggered by the kretprobe for vfs_read().
 I was given) the input file is 21760 bytes long. I copied the buffer memory section by section 
 into a local buffer size ADVENT_BUFFER_LEN. Since this buffer lives on the stack it
 can't be arbitrarily large (in fact I had to adjust the size for the different
-`examine_char*` implementations.) By using a combination of loops and
-tail calls I've been able to parse enough characters to solve this challenge. 
+`examine_char*` implementations.) By using a combination of loops and recursively calling 
+the tail call `buffer_read` I've been able to parse enough characters to solve this challenge. 
 
 ## Day 1 Part 2
 
-There are two solutions here. The one implemented in `examine_char3`
-uses an FSM to parse the digits. This uses less stack space so I can use a larger 
-size for ADVENT_BUFFER_LEN (which would allow for parsing a bigger file if necessary).
+There are two solutions here. Define `EXAMINE_CHAR` to either `examine_char2` or `eaxmine_char3`. 
+
+The version implemented in `examine_char3` uses an FSM to parse the digits. This uses less stack 
+space, so I can use a larger size for ADVENT_BUFFER_LEN (which would allow for parsing a bigger 
+file if necessary).
 
