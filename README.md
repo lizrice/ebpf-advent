@@ -9,7 +9,30 @@ load maps, and output the results.
 
 I've used a kernel v6.5.0 as supplied in Ubuntu 23.10
 
-https://github.com/lizrice/ebpf-advent/assets/458616/d5c7d3ca-0510-485b-b5d5-7f40a531046e
+## Install & set up environment 
+
+Similar to [learning-ebpf](https://github.com/lizrice/learning-ebpf) examples: 
+
+```
+# Clone the repo
+git clone --recurse-submodules https://github.com/lizrice/ebpf-advent
+cd ebpf-advent
+
+# Start a Lima VM
+limactl start advent-ebpf.yaml
+
+# You might want multiple shells. For each, just run
+limactl shell advent-ebpf
+
+# You'll need to be root 
+sudo -s
+
+# Install libbpf
+cd libbpf/src
+make install 
+cd ../..
+```
+
 
 ## Day 1 Part 1
 

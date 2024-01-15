@@ -1,0 +1,5 @@
+day1/day1.bpf.o
+day1/day1.skel.h
+day1/vmlinux.h
+day1/day1
+day1/advent.test

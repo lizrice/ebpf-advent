@@ -13,7 +13,7 @@
 
 // Use examine_char for Part 1
 // #define EXAMINE_CHAR examine_char
-#define EXAMINE_CHAR examine_char3
+#define EXAMINE_CHAR examine_char
 
 // Used by examine_char2
 // text_digits[1] = 0 if no characters from 'one'
@@ -120,6 +120,14 @@ SEC("kprobe/vfs_open")
 int BPF_KPROBE(vfs_open, struct path *path, struct file *file)
 {
 	struct event e = {};
+	e.pid = 0;
+	e.result = 0; 
+	for (u32 i=0; i<TASK_COMM_LEN; i++) {
+		e.task[i] = 0;
+	}
+	for (u32 i=0; i<DNAME_INLINE_LEN; i++) {
+		e.filename[i] = 0;
+	}
 
 	bpf_get_current_comm(&e.task, sizeof(e.task));
 	if (!bpf_map_lookup_elem(&executables, &e.task)) {
@@ -137,10 +145,10 @@ int BPF_KPROBE(vfs_open, struct path *path, struct file *file)
 	u32 pid = (u32) bpf_get_current_pid_tgid();
 	long err = bpf_map_update_elem(&start_event, &pid, &e, 0);
 	if (err) {
-		bpf_printk("error updating start_event map");
+		bpf_printk("vfs_open: error updating start_event map");
 	}
 
-	bpf_printk("Interesting file %s found by command %s pid %d", &e.filename, &e.task, pid);
+	bpf_printk("vfs_open: file %s found by command %s pid %d", &e.filename, &e.task, pid);
 	return 0;
 }
 
@@ -156,15 +164,21 @@ int BPF_KPROBE(filp_close, struct file *file)
 		if (b) {
 			e->result = b->astate.total;
 			e->pid = pid;
-			bpf_printk("Total is %d for pid %d, filename %s", e->result, pid, e->filename);
+			bpf_printk("filp_close: total is %d for pid %d, filename %s", e->result, pid, e->filename);
 			bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, e, sizeof(struct event));
 			bpf_map_delete_elem(&buffer, &pid);
 		} else {
-			bpf_printk("Missing buffer for pid %d", pid);
+			bpf_printk("filp_close: missing buffer for pid %d", pid);
 		}
-		bpf_printk("Removing start event and buffer for pid %d", pid);
-		bpf_map_delete_elem(&start_event, &pid);
-		bpf_map_delete_elem(&digit_state, &pid);
+		bpf_printk("filp_close: removing start event and buffer for pid %d", pid);
+		long err = bpf_map_delete_elem(&start_event, &pid);
+		if (err != 0) {
+			bpf_printk("filp_close: failed to delete start_event for pid %d", pid);
+		}
+		err = bpf_map_delete_elem(&digit_state, &pid);
+		if (err != 0) {
+			bpf_printk("filp_close: failed to delete digit_state for pid %d", pid);
+		}
 	} 
 
 	return 0;
@@ -184,7 +198,7 @@ int BPF_KPROBE(vfs_read, struct file *file, char *buf, size_t count, loff_t *pos
 		return 0;
 	}
 
-	bpf_printk("vfs_read for pid %d, filename %s, task %s", pid, e->filename, e->task);
+	bpf_printk("vfs_read: pid %d, filename %s, task %s", pid, e->filename, e->task);
 	struct buffer_t bb = {};
 	bb.buf = buf;
 	bb.offset = 0;
@@ -196,13 +210,12 @@ int BPF_KPROBE(vfs_read, struct file *file, char *buf, size_t count, loff_t *pos
 
 	b = bpf_map_lookup_elem(&buffer, &pid);
 	if (b) {
-		bpf_printk("Not the first read for this pid %d", pid);
 		bb.astate.first_digit = b->astate.first_digit;
 		bb.astate.last_digit = b->astate.last_digit;
 		bb.astate.total = b->astate.total;
 		bb.astate.lines = b->astate.lines;
 	} else {
-		bpf_printk("First read for this pid %d", pid);
+		bpf_printk("vfs_read: first read for pid %d", pid);
 		bb.astate.first_digit = -1;
 		bb.astate.last_digit = -1;
 		bb.astate.total = 0;
@@ -215,14 +228,14 @@ int BPF_KPROBE(vfs_read, struct file *file, char *buf, size_t count, loff_t *pos
 		}
 		err = bpf_map_update_elem(&digit_state, &pid, &ds, 0);
 		if (err) {
-			bpf_printk("error updating digit_state");
+			bpf_printk("vfs_read: error updating digit_state");
 		}
 	}
 
-	bpf_printk("Reading into buf %x with size %d, total so far %d for pid %d", buf, count, bb.astate.total, pid);
+	bpf_printk("vfs_read: buf %x with size %d, total so far %d for pid %d", buf, count, bb.astate.total, pid);
 	err = bpf_map_update_elem(&buffer, &pid, &bb, 0);
 	if (err) {
-		bpf_printk("error updating buffer");
+		bpf_printk("vfs_read: error updating buffer");
 	}
 
    return 0;
@@ -232,7 +245,7 @@ int BPF_KPROBE(vfs_read, struct file *file, char *buf, size_t count, loff_t *pos
 static long examine_char(u32 index, struct advent_state *astate) {
 	
 	if (index < ADVENT_BUFFER_LEN) {
-		// bpf_printk("[%d] %c (%d)", index, astate->buffer[index], astate->buffer[index]);
+		// bpf_printk("examine_char: [%d] %c (%d)", index, astate->buffer[index], astate->buffer[index]);
 		char c = astate->buffer[index];
 		if (c >= '0' && c <= '9') {
 			if (astate->first_digit == -1) {
@@ -248,7 +261,7 @@ static long examine_char(u32 index, struct advent_state *astate) {
 			astate->first_digit = -1;
 			astate->last_digit = -1;
 			astate->lines = astate->lines + 1;
-			bpf_printk("line %d, total so far %d", astate->lines, astate->total);
+			bpf_printk("examine_char: new line %d, total so far %d", astate->lines, astate->total);
 		}
 	}
 	return 0;
@@ -258,7 +271,7 @@ static long examine_char(u32 index, struct advent_state *astate) {
 static long examine_char2(u32 index, struct advent_state *astate) {
 	struct digit_state_t *ds = bpf_map_lookup_elem(&digit_state, &astate->pid);
 	if (!ds) {
-		bpf_printk("No digit state for pid %d", astate->pid);
+		bpf_printk("examine_char2: no digit state for pid %d", astate->pid);
 		return 1;
 	}
 
@@ -273,7 +286,7 @@ static long examine_char2(u32 index, struct advent_state *astate) {
 	s8 nine = ds->text_digits[9];
 
 	if (index < ADVENT_BUFFER_LEN) {
-		// bpf_printk("[%d] %c (%d)", index, astate->buffer[index], astate->buffer[index]);
+		// bpf_printk("examine_char2: [%d] %c (%d)", index, astate->buffer[index], astate->buffer[index]);
 		char c = astate->buffer[index];
 
 		// one, two, three, four, five, six, seven, eight, nine
@@ -380,10 +393,10 @@ static long examine_char2(u32 index, struct advent_state *astate) {
 
 		if (c >= '0' && c <= '9') {
 			if (astate->first_digit == -1) {
-				// bpf_printk("First digit %c", c);
+				// bpf_printk("examine_char2: first digit %c", c);
 				astate->first_digit = c - '0';
 			} 
-			// bpf_printk("Candidate last digit %c", c);
+			// bpf_printk("examine_char2: candidate last digit %c", c);
 			astate->last_digit = c - '0';
 		}
 
@@ -392,7 +405,7 @@ static long examine_char2(u32 index, struct advent_state *astate) {
 				bpf_printk("No first or last digit to add");
 			} else {
 				astate->total = astate->total + (astate->first_digit * 10) + astate->last_digit;
-				// bpf_printk("line %d first digit %d, last digit %d", astate->lines, astate->first_digit, astate->last_digit);
+				// bpf_printk("examine_char2: line %d first digit %d, last digit %d", astate->lines, astate->first_digit, astate->last_digit);
 				bpf_printk("line %d, %d %d total: %d ", astate->lines + 1, astate->first_digit, astate->last_digit, astate->total);
 			}
 
@@ -401,7 +414,7 @@ static long examine_char2(u32 index, struct advent_state *astate) {
 			astate->lines = astate->lines + 1;
 			one = 0; two = 0; three = 0; four = 0; five = 0; six = 0; seven = 0; eight = 0; nine = 0;
 
-			// bpf_printk("total so far %d", astate->total);
+			// bpf_printk("examine_char2: total so far %d", astate->total);
 		}
 	}
 
@@ -427,7 +440,7 @@ static long examine_char3(u32 index, struct advent_state *astate) {
 	si.state = astate->table_state;;
 
 	if (index < ADVENT_BUFFER_LEN) {
-		// bpf_printk("[%d] %c (%d)", index, astate->buffer[index], astate->buffer[index]);
+		// bpf_printk("examine_char3: [%d] %c (%d)", index, astate->buffer[index], astate->buffer[index]);
 		char c = astate->buffer[index];
 		si.input = c; 
 		so = bpf_map_lookup_elem(&state_table, &si);
@@ -474,7 +487,7 @@ int buffer_read(struct pt_regs *ctx) {
 	u32 pid = (u32) bpf_get_current_pid_tgid();
 	struct buffer_t *b = bpf_map_lookup_elem(&buffer, &pid); 
 	if (!b) {
-		bpf_printk("No buffer state for pid %d", pid);		
+		bpf_printk("buffer_read: no buffer state for pid %d", pid);		
 		return 0;
 	}
 
@@ -490,10 +503,17 @@ int buffer_read(struct pt_regs *ctx) {
 	char *location;
 
 	for (u8 j = 0; (j < LOOPS) && (b->offset < b->length); j++) {
-		bpf_printk("length %d, offset %d from %x", b->length, b->offset, b->buf);
 		location = b->buf + b->offset;
-		bpf_probe_read_user(astate.buffer, ADVENT_BUFFER_LEN, location);
-		long ii = bpf_loop(ADVENT_BUFFER_LEN, EXAMINE_CHAR, &astate, 0);
+		u32 read_length = b->length - b->offset; 
+		if (read_length > ADVENT_BUFFER_LEN) {
+			read_length = ADVENT_BUFFER_LEN;
+		}
+		bpf_printk("buffer_read: length %d, offset %d from %x, read %d chars", b->length, b->offset, b->buf, read_length);
+		bpf_probe_read_user(astate.buffer, read_length, location);
+		long ii = bpf_loop(read_length, EXAMINE_CHAR, &astate, 0);
+		if (ii != read_length) {
+			bpf_printk("buffer_read: surprise! %d loops != read_length %d");
+		}
 		b->offset += ADVENT_BUFFER_LEN;
 	}
 
@@ -506,7 +526,7 @@ int buffer_read(struct pt_regs *ctx) {
 	bpf_map_update_elem(&buffer, &pid, b, 0);	
 
 	if (b->length > b->offset) {		
-		bpf_printk("%d bytes left, total so far is %d, depth %d", b->length - b->offset, b->astate.total, b->depth);
+		bpf_printk("buffer_read: %d bytes left, total so far is %d, depth %d", b->length - b->offset, b->astate.total, b->depth);
 		bpf_tail_call(ctx, &tailcalls, DO_BUFFER_READ);
 	}
 	return 0;
@@ -517,19 +537,32 @@ SEC("kretprobe/vfs_read")
 int BPF_KRETPROBE(vfs_read_ret, long ret)
 {
 	u32 pid = (u32) bpf_get_current_pid_tgid();
+
+    char task[TASK_COMM_LEN];	
+	bpf_get_current_comm(&task, sizeof(task));
+	if (!bpf_map_lookup_elem(&executables, &task)) {
+		// skip this executable
+		// Tracing to try to debug missing kretprobe calls
+		// if (pid > 4400) {
+		// 	bpf_printk("vfs_read ret: %d", pid);
+		// }		
+		return 0;
+	}
+
 	struct event *e = bpf_map_lookup_elem(&start_event, &pid);
 	if (!e) {
 		// Not a file read we are interested in
+		bpf_printk("vfs_read ret: Not interested for %d", pid);
 		return 0;
 	}
 
 	struct buffer_t *b = bpf_map_lookup_elem(&buffer, &pid); 
 	if (!b) {
-		bpf_printk("No matching pid entry for %d in vfs_read_ret", pid);
+		bpf_printk("vfs_read ret: No matching pid entry for %d", pid);
 		return 0;
 	}
 
-	bpf_printk("File read complete %d chars into into %x, total %d for pid %d", ret, b->buf, b->astate.total, pid);
+	bpf_printk("vfs_read ret: file read complete %d chars into into %x, total %d for pid %d", ret, b->buf, b->astate.total, pid);
 	if (ret <= 0){
 		return 0;
 	}
