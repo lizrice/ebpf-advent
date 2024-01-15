@@ -69,6 +69,7 @@ void filter_filename(struct day1_bpf *skel, const char *filename) {
 	printf("filtered %s\n", filename);
 }
 
+#ifdef PART2A
 #define ADD_ENTRY(ss, ii, nn, oo) si.state=ss;si.input=ii;so.new_state=nn;so.output=oo; \
 	bpf_map__update_elem(skel->maps.state_table, &si, sizeof(si), &so, sizeof(so), 0);
 
@@ -167,6 +168,7 @@ void populate_state_table(struct day1_bpf *skel) {
 	ADD_ENTRY(24, 'e', 1, 9);
 	ADD_ENTRY(24, 'i', 23, 0);
 }
+#endif
 
 int main()
 {
@@ -216,7 +218,11 @@ int main()
 	filter_filename(skel, "advent.full");
 	filter_filename(skel, "advent.example");
 	filter_filename(skel, "advent.test");
+
+#ifdef PART2A
+	printf("Populated state table\n");
 	populate_state_table(skel);
+#endif
 
 	printf("%-8s %-6s %-8s %-16s %-6s\n", "TIME", "PID", "COMM", "FILE", "RESULT");
 
