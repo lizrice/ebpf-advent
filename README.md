@@ -33,10 +33,14 @@ make install
 cd ../..
 ```
 
+## Building and running the code
 
-## Day 1 Part 1
+Run any of `make p1`, `make p2` or `make p2a` to get an executable called
+`day1`. Run this (as root) in one terminal and in another run 
+`cat advent.example` or `cat advent.full`. You could also use a third terminal
+to run `bpftool prog trace` to see tracing / debugging output.
 
-In line 16 define `EXAMINE_CHAR` to `examine_char`.
+## Filtering interesting events
 
 The kprobe attached to vfs_open() lets us ignore files that we're not interested
 in, being read by any other executables. 
@@ -45,20 +49,32 @@ In the kprobe attached to vfs_read() we can get the address of the buffer that
 data will be read into, but it won't be populated at that point. Parsing the
 contents of the buffer is triggered by the kretprobe for vfs_read(). 
 
-### File parsing
+## File parsing
 
 `cat` reads into a 128k buffer. In this challenge (at least for the puzzle input 
 I was given) the input file is 21760 bytes long. I copied the buffer memory section by section 
 into a local buffer size ADVENT_BUFFER_LEN. Since this buffer lives on the stack it
 can't be arbitrarily large (in fact I had to adjust the size for the different
-`examine_char*` implementations.) By using a combination of loops and recursively calling 
+`examine_char` implementations.) By using a combination of loops and recursively calling 
 the tail call `buffer_read` I've been able to parse enough characters to solve this challenge. 
+
+## Day 1 Part 1
+
+The challenge here is to find the first and last digits in each line,
+combine those into a two-digit number and then add up all these numbers. The
+code is in day1p1.bpf.c.
+
+Lines could very easily be split across the arbitrary ADVENT_BUFFER_LEN
+boundary.
 
 ## Day 1 Part 2
 
-There are two solutions here. Define `EXAMINE_CHAR` to either `examine_char2` or `examine_char3`. 
+In part 2, you also have to account for digits that might be spelled out as
+words (for example `two`, instead of `2`).
 
-The version implemented in `examine_char3` uses an FSM to parse the digits. This uses less stack 
+There are two solutions here in `day1p2.bpf.c` and `day1p2a.bpf.c`.
+
+The first is the straightforward way. The second version uses an FSM to parse the digits. This uses less stack 
 space, so I can use a larger size for ADVENT_BUFFER_LEN (which would allow for parsing a bigger 
 file if necessary).
 
